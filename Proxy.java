@@ -24,7 +24,7 @@ public class Proxy implements Runnable {
     //Create Proxy
     public Proxy(int port) throws IOException, ClassNotFoundException {
         cachedPages = new Hashtable<>();
-        blockedPages = new ArrayList<>();
+        blockedPages = new Hashtable<>();
         currentThreads = new ArrayList<>();
         new Thread(this).start();
 
