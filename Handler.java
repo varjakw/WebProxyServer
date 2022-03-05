@@ -42,8 +42,8 @@ public class Handler implements Runnable{
     private void getPage(String url) throws IOException {
 
         int dotIndex = url.lastIndexOf(".");
-        String extension = url.substring(index, url.length());
-        String name = url.substring(0,index);
+        String extension = url.substring(dotIndex, url.length());
+        String name = url.substring(0,dotIndex);
 
         //remove slashes and dots from file names
         name = name.replace("/","_");
