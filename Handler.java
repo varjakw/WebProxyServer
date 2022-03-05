@@ -6,6 +6,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.util.Hashtable;
 
 public class Handler implements Runnable{
     Socket socket;
@@ -25,44 +26,39 @@ public class Handler implements Runnable{
     ////////////////////////////
 
     private void useCachedPage(File file) throws IOException {
-        BufferedReader cacheReader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-        String message = "Proxy OK";
-        writer.write(message);
-        writer.flush();
 
+        BufferedReader cacheReader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+        String message = "Request succesful";
+        p2cWriter.write(message);
+        p2cWriter.flush();
         String string = cacheReader.readLine();
         while (string != null){
-            writer.write(string);
+            p2cWriter.write(string);
         }
-        writer.flush();
-
+        p2cWriter.flush();
         cacheReader.close();
-        writer.close();
+        p2cWriter.close();
     }
 
     private void getPage(String url) throws IOException {
-        BufferedReader remoteReader = null;
-        int index = url.lastIndexOf(".");
+
+        int dotIndex = url.lastIndexOf(".");
         String extension = url.substring(index, url.length());
         String name = url.substring(0,index);
 
+        //remove slashes and dots from file names
+        name = name.replace("/","_");
+        name = name.replace(".","-");
+        //add extension
+        name = name + extension;
+
         File cacheFile = new File("cache/" + name);
-        //buff stream to write to cached file
-        BufferedWriter cw = new BufferedWriter(new FileWriter(cacheFile));
+        if(!cacheFile.exists()){
+            cacheFile.createNewFile();
+        }
+        //writing to file in cache
+        BufferedWriter cacheWriter = new BufferedWriter(new FileWriter(cacheFile));
 
-        //if the file is a picture
-        if(extension.contains(".png") || extension.contains(".jpg")){
-            URL link = new URL(url);
-            BufferedImage pic = ImageIO.read(link);
-            //cache the picture
-            ImageIO.write(pic, extension.substring(1),cacheFile);
-            String message = "Proxy OK";
-            writer.write(message);
-            writer.flush();
-
-            //send image to client
-            ImageIO.write(pic, extension.substring(1),socket.getOutputStream());
-        }else{
             URL link = new URL(url);
             //connect to remote server
             HttpsURLConnection proxy2Server = (HttpsURLConnection)link.openConnection();
@@ -83,15 +79,13 @@ public class Handler implements Runnable{
                 //write to cache
                 cw.write(message);
             }
+            writer.flush();
+            remoteReader.close();
 
-        }
-        writer.flush();
-        remoteReader.close();
-
-        cw.flush();
-        Proxy.addToCache(url, cacheFile);
-        cw.close();
-        writer.close();
+           cw.flush();
+            Proxy.addToCache(url, cacheFile);
+            cw.close();
+            writer.close();
     }
 
     private void takeRequest(String url) throws IOException {
@@ -197,9 +191,17 @@ public class Handler implements Runnable{
             File cachedFile = Proxy.getFromCache(url);
             if(cachedFile != null){
                 System.out.println("Site found in cache");
-                useCachedPage(cachedFile);
+                try {
+                    useCachedPage(cachedFile);
+                } catch (IOException e) {
+                   System.out.println("IOException");
+                }
             } else{
-                getPage(url);
+                try {
+                    getPage(url);
+                } catch (IOException e) {
+                    System.out.println("IOException");
+                }
             }
         }
 
