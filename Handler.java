@@ -24,22 +24,26 @@ public class Handler implements Runnable{
 
     }
 
-    private void useCachedPage(File file) throws IOException {
+    private void useCachedPage(File file) throws FileNotFoundException {
 
         BufferedReader cacheReader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
         String message = "Request succesful";
-        p2cWriter.write(message);
-        p2cWriter.flush();
-        String string = cacheReader.readLine();
-        while (string != null){
-            p2cWriter.write(string);
+        try {
+            p2cWriter.write(message);
+            p2cWriter.flush();
+            String string = cacheReader.readLine();
+            while (string != null) {
+                p2cWriter.write(string);
+            }
+            p2cWriter.flush();
+            cacheReader.close();
+            p2cWriter.close();
+        }catch (IOException e) {
+            System.out.println("Error with accessing cached page");
         }
-        p2cWriter.flush();
-        cacheReader.close();
-        p2cWriter.close();
     }
 
-    private void getPage(String url) throws IOException {
+    private void getPage(String url) {
 
         int dotIndex = url.lastIndexOf(".");
         String extension = url.substring(dotIndex, url.length());
@@ -53,36 +57,51 @@ public class Handler implements Runnable{
 
         File cacheFile = new File("cache/" + name);
         if(!cacheFile.exists()){
-            cacheFile.createNewFile();
-        }
-        //writing to file in cache
-        BufferedWriter cacheWriter = new BufferedWriter(new FileWriter(cacheFile));
+            try {
+                cacheFile.createNewFile();
+            } catch (IOException e) {
+                    System.out.println("Error with creating cache page");
+                e.printStackTrace();
 
-        URL link = new URL(url);
-        //connect to remote server
-        HttpsURLConnection conn = (HttpsURLConnection)link.openConnection();
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        conn.setRequestProperty("Content-Language", "en-UK");
-        conn.setUseCaches(false);
-        conn.setDoOutput(true);
-        //reader of remote server
-        //proxyToServerBR
-        BufferedReader remoteReader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        p2cWriter.write("Request successful");
-
-        String message = remoteReader.readLine();
-        while(message != null){
-            //send to client
-            p2cWriter.write(message);
-            //write to cache
-            cacheWriter.write(message);
+            }
         }
-        p2cWriter.flush();
-        remoteReader.close();
-        cacheWriter.flush();
-        Proxy.addToCache(url, cacheFile);
-        cacheWriter.close();
-        p2cWriter.close();
+        BufferedReader remoteReader = null;
+        BufferedWriter cacheWriter = null;
+        try {
+            //writing to file in cache
+            cacheWriter = new BufferedWriter(new FileWriter(cacheFile));
+
+            URL link = new URL(url);
+            //connect to remote server
+            HttpsURLConnection conn = (HttpsURLConnection) link.openConnection();
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            conn.setRequestProperty("Content-Language", "en-UK");
+            conn.setUseCaches(false);
+            conn.setDoOutput(true);
+            //reader of remote server
+            //proxyToServerBR
+            remoteReader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            p2cWriter.write("Request successful");
+
+            String message = remoteReader.readLine();
+            while (message != null) {
+                //send to client
+                p2cWriter.write(message);
+                //write to cache
+                cacheWriter.write(message);
+            }
+            p2cWriter.flush();
+            remoteReader.close();
+            cacheWriter.flush();
+            Proxy.addToCache(url, cacheFile);
+            cacheWriter.close();
+            p2cWriter.close();
+
+        } catch(IOException e){
+            System.out.println("Error sending to client");
+            e.printStackTrace();
+        }
+      //here
     }
 
     private void takeRequest(String url) throws IOException {
@@ -126,10 +145,10 @@ public class Handler implements Runnable{
             } while (in >= 0);
         }
         catch (SocketTimeoutException e) {
-            System.out.println("IOException");
+            System.out.println("SocketTimeoutException");
         }
         catch (IOException e) {
-            System.out.println("IOException");
+            System.out.println("Issue with remote listen & push to client");
         }
         if(p2sSocket != null){
             p2sSocket.close();
@@ -150,7 +169,7 @@ public class Handler implements Runnable{
         try {
             requestToHandle = p2cReader.readLine();
         } catch (IOException e) {
-            System.out.println("IOException");
+            System.out.println("Error reading the HTTPS requestToHandle");
         }
 
         System.out.println("Request received: " + requestToHandle);
@@ -159,6 +178,12 @@ public class Handler implements Runnable{
         String method = requestToHandle.substring(0,requestToHandle.indexOf(' '));
         String url = requestToHandle.substring(requestToHandle.indexOf(' ')+1);
         url = url.substring(0,url.indexOf(' '));
+
+        //append protocol to front
+        if(!url.substring(0,5).equals("https")){
+            String http = "https://";
+            url = http + url;
+        }
 
         Hashtable temp = Proxy.blocked;
         //check if the page is blocked
@@ -170,7 +195,7 @@ public class Handler implements Runnable{
                 bw.write(error);
                 bw.flush();
             } catch (IOException e) {
-                System.out.println("IOException");
+                System.out.println("Error handling a blocked site");
             }
         }
 
@@ -181,7 +206,7 @@ public class Handler implements Runnable{
                 System.out.println("Connection requested");
                 takeRequest(url);
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("Error with takeRequest");
             }
         } else {
             //check cache
@@ -191,22 +216,12 @@ public class Handler implements Runnable{
                 try {
                     useCachedPage(cachedFile);
                 } catch (IOException e) {
-                   System.out.println("IOException");
+                   System.out.println("Error using cached file");
                 }
             } else{
-                try {
-                    getPage(url);
-                } catch (IOException e) {
-                    System.out.println("IOException");
-                }
+                getPage(url);
             }
         }
 
-    }
-
-    private void requestBlocked() throws IOException {
-        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-        bw.write("site blocked. contact admin");
-        bw.flush();
     }
 }

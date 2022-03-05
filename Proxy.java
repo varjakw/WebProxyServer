@@ -23,7 +23,7 @@ public class Proxy implements Runnable {
     static ArrayList<Thread> currentThreads;
 
     //Create Proxy
-    public Proxy(int port) throws IOException, ClassNotFoundException {
+    public Proxy(int port) throws ClassNotFoundException {
         cache = new Hashtable<>();
         blocked = new Hashtable<>();
         currentThreads = new ArrayList<>();
@@ -57,7 +57,11 @@ public class Proxy implements Runnable {
         }
 
         //make server
-        socketS = new ServerSocket(port);
+        try {
+            socketS = new ServerSocket(port);
+        } catch (IOException e) {
+            System.out.println("Error making server socket");
+        }
         System.out.println("Waiting...");
         running = true;
     }
@@ -72,12 +76,12 @@ public class Proxy implements Runnable {
                 thread.start();
             }
         }catch(IOException e){
-            System.out.println("IOException");
+            System.out.println("Error with thread listening");
         }
 
     }
 
-    public void shutdown() throws IOException, InterruptedException {
+    public void shutdown() throws InterruptedException {
         System.out.println("Shutting down...");
         running = false;
         try{
@@ -104,7 +108,7 @@ public class Proxy implements Runnable {
             socketS.close();
             System.out.println("Socket closed");
         } catch(IOException e){
-            System.out.println("IOException");
+            System.out.println("Error closing socket");
         }
     }
 
@@ -136,25 +140,23 @@ public class Proxy implements Runnable {
             System.out.println("Please type:\n 1: A site you want blocked \n 2: \"cache\" to view cache \n 3: \"blocked\" to view a list of blocked sites \n 4: \"shutdown\" to shut the server down");
             input = scanner.nextLine();
 
-            if(input == "cache"){
+            if(input.equals("cache")){
                 System.out.println("\n Cached Sites");
                 for(String cachedSite : cache.keySet()){
                     System.out.println(cachedSite);
                 }
                 System.out.println();
             }
-            else if(input == "blocked"){
+            else if(input.equals("blocked")){
                 System.out.println("\n Blocked Sites: ");
                 for(String blockedSite : blocked.keySet()){
                     System.out.println(blockedSite);
                 }
                 System.out.println();
             }
-            else if(input == "shutdown"){
+            else if(input.equals("shutdown")){
                 try {
                     shutdown();
-                } catch (IOException e) {
-                    System.out.println("IOException");
                 } catch (InterruptedException e) {
                     System.out.println("InterruptedException");
                 }
@@ -167,8 +169,9 @@ public class Proxy implements Runnable {
 
     }
 
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
-        Proxy proxy = new Proxy(8080);
+    public static void main(String[] args) throws ClassNotFoundException {
+        Proxy proxy = null;
+        proxy = new Proxy(8080);
         proxy.listen();
         //listen for connections
     }

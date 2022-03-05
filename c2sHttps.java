@@ -18,16 +18,16 @@ public class c2sHttps implements Runnable {
         try {
             // Read byte by byte from client and send directly to server
             byte[] buffer = new byte[4096];
-            int read;
+            int in;
             do {
-                read = p2c.read(buffer);
-                if (read > 0) {
-                    p2s.write(buffer, 0, read);
+                in = p2c.read(buffer);
+                if (in > 0) {
+                    p2s.write(buffer, 0, in);
                     if (p2c.available() < 1) {
                         p2s.flush();
                     }
                 }
-            } while (read >= 0);
+            } while (in >= 0);
         }
         catch (SocketTimeoutException ste) {
             System.out.println("timeout");
