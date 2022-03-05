@@ -23,7 +23,6 @@ public class Handler implements Runnable{
         p2cWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
     }
-    ////////////////////////////
 
     private void useCachedPage(File file) throws IOException {
 
@@ -59,43 +58,41 @@ public class Handler implements Runnable{
         //writing to file in cache
         BufferedWriter cacheWriter = new BufferedWriter(new FileWriter(cacheFile));
 
-            URL link = new URL(url);
-            //connect to remote server
-            HttpsURLConnection proxy2Server = (HttpsURLConnection)link.openConnection();
-            proxy2Server.setRequestProperty("Content-Type",
-                    "application/x-www-form-urlencoded");
-            proxy2Server.setRequestProperty("Content-Language", "en-UK");
-            proxy2Server.setUseCaches(false);
-            proxy2Server.setDoOutput(true);
+        URL link = new URL(url);
+        //connect to remote server
+        HttpsURLConnection conn = (HttpsURLConnection)link.openConnection();
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("Content-Language", "en-UK");
+        conn.setUseCaches(false);
+        conn.setDoOutput(true);
+        //reader of remote server
+        //proxyToServerBR
+        BufferedReader remoteReader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        p2cWriter.write("Request successful");
 
-            //reader of remote server
-            //proxyToServerBR
-            remoteReader = new BufferedReader(new InputStreamReader(proxy2Server.getInputStream()));
-            writer.write("200");
-            String message = remoteReader.readLine();
-            while(message != null){
-                //send to client
-                writer.write(message);
-                //write to cache
-                cw.write(message);
-            }
-            writer.flush();
-            remoteReader.close();
-
-           cw.flush();
-            Proxy.addToCache(url, cacheFile);
-            cw.close();
-            writer.close();
+        String message = remoteReader.readLine();
+        while(message != null){
+            //send to client
+            p2cWriter.write(message);
+            //write to cache
+            cacheWriter.write(message);
+        }
+        p2cWriter.flush();
+        remoteReader.close();
+        cacheWriter.flush();
+        Proxy.addToCache(url, cacheFile);
+        cacheWriter.close();
+        p2cWriter.close();
     }
 
     private void takeRequest(String url) throws IOException {
         String link = url.substring(7);
         String array[] = link.split(":");
         link = array[0];
-        int port = Integer.valueOf(array[1]);
+        int port = Integer.parseInt(array[1]);
 
         for(int i=0;i<5;i++){
-            reader.readLine();
+            p2cReader.readLine();
         }
         //ip of url
         InetAddress ip = InetAddress.getByName(url);
@@ -103,48 +100,48 @@ public class Handler implements Runnable{
         Socket p2sSocket = new Socket(ip,port);
         p2sSocket.setSoTimeout(10000);
         //send this connection to the client
-        writer.write("200 Connection made");
-        writer.flush();
+        p2cWriter.write("Connection made");
+        p2cWriter.flush();
 
+        //thread to handle simultaneous data
         BufferedWriter p2sWriter = new BufferedWriter(new OutputStreamWriter(p2sSocket.getOutputStream()));
         BufferedReader p2sReader = new BufferedReader(new InputStreamReader(p2sSocket.getInputStream()));
 
         c2sHttps c2sHttps = new c2sHttps(socket.getInputStream(),p2sSocket.getOutputStream());
-        Thread c2s = new Thread(c2sHttps);
+        c2s = new Thread(c2sHttps);
         c2s.start();
 
         //listen to remote and push to client
         try {
             byte[] buffer = new byte[4096];
-            int read;
+            int in;
             do {
-                read = p2sSocket.getInputStream().read(buffer);
-                if (read > 0) {
-                    socket.getOutputStream().write(buffer, 0, read);
+                in = p2sSocket.getInputStream().read(buffer);
+                if (in > 0) {
+                    socket.getOutputStream().write(buffer, 0, in);
                     if (p2sSocket.getInputStream().available() < 1) {
                         socket.getOutputStream().flush();
                     }
                 }
-            } while (read >= 0);
+            } while (in >= 0);
         }
         catch (SocketTimeoutException e) {
-            writer.write("Timeout!");
-            writer.flush();
+            System.out.println("IOException");
         }
         catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("IOException");
         }
-
-
         if(p2sSocket != null){
             p2sSocket.close();
         }
-
+        if(p2sReader != null){
+            p2sWriter.close();
+        }
         if(p2sWriter != null){
             p2sWriter.close();
         }
-        if(writer != null){
-            writer.close();
+        if(p2cWriter != null){
+            p2cWriter.close();
         }
     }
 
