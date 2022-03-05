@@ -9,6 +9,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.Scanner;
 
 public class Proxy implements Runnable {
     private ServerSocket socketS;
@@ -16,7 +17,7 @@ public class Proxy implements Runnable {
     //HashTable with page URL as value and cached file as the key.
     static Hashtable<String, File> cachedPages;
     //ArrayList for a dynamic-sized list of blocked sites.
-    static ArrayList<String> blockedPages;
+    static Hashtable<String, String> blockedPages;
     //ArrayList for a dynamic-sized list of currently-running threads
     static ArrayList<Thread> currentThreads;
 
@@ -39,7 +40,7 @@ public class Proxy implements Runnable {
         File blocked = new File("blocked.txt");
         FileInputStream fis2 = new FileInputStream(blocked);
         ObjectInputStream ois2 = new ObjectInputStream(fis2);
-        blockedPages = (ArrayList<String>) ois2.readObject();
+        blockedPages = (Hashtable<String, String>) ois2.readObject();
         fis2.close();
         ois2.close();
 
@@ -60,7 +61,7 @@ public class Proxy implements Runnable {
 
     }
 
-    public void shutdown() throws IOException {
+    public void shutdown() throws IOException, InterruptedException {
         System.out.println("Shutting down...");
         running = false;
 
@@ -78,11 +79,38 @@ public class Proxy implements Runnable {
         oos2.close();
         fos2.close();
 
+        //close threads
+        for(Thread thread : currentThreads){
+            if(thread.isAlive()){
+                thread.join();
+            }
+        }
+
+        //kill socket
+        socketS.close();
+
 
 
     }
 
-    public static void main(String[] args) {
+    public static File getFromCache(String url){
+        return cachedPages.get(url);
+        //return cached file/page if it is cached
+    }
+
+    public static void addToCache(String url, File file){
+        cachedPages.put(url, file);
+    }
+
+    public static boolean blocked (String url) {
+        if(blockedPages.get(url) != null){
+            return true;
+        } else{
+            return false;
+        }
+    }
+
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
         // Create an instance of Proxy and begin listening for connections
         Proxy myProxy = new Proxy(8080);
         myProxy.listen();
@@ -90,6 +118,18 @@ public class Proxy implements Runnable {
 
     @Override
     public void run() {
+        Scanner scanner = new Scanner(System.in);
+        String input = scanner.nextLine();
 
+        if(input == "stop"){
+            running = false;
+            try {
+                shutdown();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
