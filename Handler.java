@@ -115,7 +115,8 @@ public class Handler implements Runnable{
         BufferedReader p2sReader = new BufferedReader(new InputStreamReader(p2sSocket.getInputStream()));
 
         c2sHttps c2sHttps = new c2sHttps(socket.getInputStream(),p2sSocket.getOutputStream());
-        c2s = new Thread(c2sHttps);
+        Thread c2s = new Thread(c2sHttps);
+        c2s.start();
 
         //listen to remote and push to client
         try {
@@ -166,9 +167,9 @@ public class Handler implements Runnable{
         url = url.substring(0,url.indexOf(' '));
 
         if(Proxy.blocked(url)){
-            System.out.println("This site is blocked.\n Contact the administrator.")
+            System.out.println("This site is blocked.\n Contact the administrator.");
             try {
-                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))
+                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
                 String error = " Site is blocked!";
                 bw.write(error);
                 bw.flush();
@@ -178,7 +179,11 @@ public class Handler implements Runnable{
         }
 
         if(method == "CONNECT"){
-            takeRequest(url);
+            try {
+                takeRequest(url);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         } else {
             //check cache
             cachedFile = Proxy.getFromCache(url);
@@ -189,9 +194,19 @@ public class Handler implements Runnable{
                     e.printStackTrace();
                 }
             } else{
-                getPage(url);
+                try {
+                    getPage(url);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
 
+    }
+
+    private void requestBlocked() throws IOException {
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        bw.write("site blocked. contact admin");
+        bw.flush();
     }
 }
