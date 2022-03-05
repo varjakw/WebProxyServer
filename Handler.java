@@ -9,19 +9,20 @@ import java.net.URL;
 
 public class Handler implements Runnable{
     Socket socket;
-    private Thread https;
-    BufferedReader reader;
-    BufferedWriter writer;
+    private Thread c2s;
+    BufferedReader p2cReader;
+    BufferedWriter p2cWriter;
     String requestToHandle;
     File cachedFile;
 
     public Handler(Socket socket) throws IOException {
         this.socket = socket;
         this.socket.setSoTimeout(3000);
-        reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        p2cReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        p2cWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
     }
+    ////////////////////////////
 
     private void useCachedPage(File file) throws IOException {
         BufferedReader cacheReader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
@@ -84,13 +85,13 @@ public class Handler implements Runnable{
             }
 
         }
-            writer.flush();
-            remoteReader.close();
+        writer.flush();
+        remoteReader.close();
 
-            cw.flush();
-            Proxy.addToCache(url, cacheFile);
-            cw.close();
-            writer.close();
+        cw.flush();
+        Proxy.addToCache(url, cacheFile);
+        cw.close();
+        writer.close();
     }
 
     private void takeRequest(String url) throws IOException {
@@ -156,49 +157,49 @@ public class Handler implements Runnable{
     @Override
     public void run() {
         try {
-            requestToHandle = reader.readLine();
+            requestToHandle = p2cReader.readLine();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("IOException");
         }
+
+        System.out.println("Request received: " + requestToHandle);
 
         //get url from the string
         String method = requestToHandle.substring(0,requestToHandle.indexOf(' '));
         String url = requestToHandle.substring(requestToHandle.indexOf(' ')+1);
         url = url.substring(0,url.indexOf(' '));
 
-        if(Proxy.blocked(url)){
-            System.out.println("This site is blocked.\n Contact the administrator.");
+        Hashtable temp = Proxy.blocked;
+        //check if the page is blocked
+        if(temp.containsKey(url)){
+            System.out.println( url + " is blocked.\n Contact the administrator.");
             try {
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                String error = " Site is blocked!";
+                String error = "Site is blocked!";
                 bw.write(error);
                 bw.flush();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("IOException");
             }
         }
 
+        /////////////////////
+
         if(method == "CONNECT"){
             try {
+                System.out.println("Connection requested");
                 takeRequest(url);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         } else {
             //check cache
-            cachedFile = Proxy.getFromCache(url);
+            File cachedFile = Proxy.getFromCache(url);
             if(cachedFile != null){
-                try {
-                    useCachedPage(cachedFile);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                System.out.println("Site found in cache");
+                useCachedPage(cachedFile);
             } else{
-                try {
-                    getPage(url);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                getPage(url);
             }
         }
 
