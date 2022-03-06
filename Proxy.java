@@ -66,17 +66,6 @@ public class Proxy implements Runnable {
         running = true;
     }
 
-    public static void main(String[] args) {
-        Proxy proxy = null;
-        try {
-            proxy = new Proxy(8080);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        proxy.listen();
-        //listen for connections
-    }
-
     //listen for new connections
     public void listen() {
         try{
@@ -133,15 +122,6 @@ public class Proxy implements Runnable {
         cache.put(url, file);
     }
 
-    ////////////////
-    public static boolean blocked (String url) {
-        if(blocked.get(url) != null){
-            return true;
-        } else{
-            return false;
-        }
-    }
-    /////////////////////
     @Override
     public void run() {
         Scanner scanner = new Scanner(System.in);

@@ -3,11 +3,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
 
-public class c2sHttps implements Runnable {
+public class Https implements Runnable {
     InputStream p2c;
     OutputStream p2s;
 
-    public c2sHttps(InputStream p2c, OutputStream p2s){
+    public Https(InputStream p2c, OutputStream p2s){
         this.p2c = p2c;
         this.p2s = p2s;
     }

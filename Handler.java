@@ -2,12 +2,14 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
+import java.util.Hashtable;
 
 public class Handler implements Runnable {
     private Thread transmission;
     Socket socket;
     BufferedReader p2cReader;
     BufferedWriter p2cWriter;
+    String requestToHandle;
 
 
     public Handler(Socket socket){
@@ -19,65 +21,6 @@ public class Handler implements Runnable {
         }
         catch (IOException e) {
             e.printStackTrace();
-        }
-    }
-
-    @Override
-    public void run() {
-
-        // Get Request from client
-        String requestFromC;
-        try{
-            requestFromC = p2cReader.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.out.println("Error reading request from client");
-            return;
-        }
-
-        // Parse out URL
-
-        System.out.println("Request Received " + requestFromC);
-        // Get the Request type
-        String request = requestFromC.substring(0,requestFromC.indexOf(' '));
-
-        // remove request type and space
-        String urlString = requestFromC.substring(requestFromC.indexOf(' ')+1);
-
-        // Remove everything past next space
-        urlString = urlString.substring(0, urlString.indexOf(' '));
-
-        // Prepend http:// if necessary to create correct URL
-        if(!urlString.substring(0,4).equals("http")){
-            String temp = "http://";
-            urlString = temp + urlString;
-        }
-
-        System.out.println("check if site is blocked");
-        // Check if site is blocked
-        if(Proxy.blocked(urlString)){
-            System.out.println("Blocked site requested : " + urlString);
-            blockedSiteRequested();
-            return;
-        }
-
-
-        // Check request type
-        if(request.equals("CONNECT")){
-            System.out.println("HTTPS Request for : " + urlString + "\n");
-            handleHTTPSRequest(urlString);
-        }
-
-        else{
-            // Check if we have a cached copy
-            File file;
-            if((file = Proxy.getFromCache(urlString)) != null){
-                System.out.println("Cached Copy found for : " + urlString + "\n");
-                useCachedPage(file);
-            } else {
-                System.out.println("HTTP GET for : " + urlString + "\n");
-                sendNonCachedToClient(urlString);
-            }
         }
     }
 
@@ -322,7 +265,7 @@ public class Handler implements Runnable {
      * Handles HTTPS requests between client and remote server
      * @param urlString desired file to be transmitted over https
      */
-    private void handleHTTPSRequest(String urlString){
+    private void takeRequest(String urlString){
         // Extract the URL and port of remote
         String url = urlString.substring(7);
         String pieces[] = url.split(":");
@@ -365,10 +308,10 @@ public class Handler implements Runnable {
 
 
             // Create a new thread to listen to client and transmit to server
-            ClientToServerHttpsTransmit clientToServerHttps =
-                    new ClientToServerHttpsTransmit(socket.getInputStream(), proxyToServerSocket.getOutputStream());
+            Https https =
+                    new Https(socket.getInputStream(), proxyToServerSocket.getOutputStream());
 
-            transmission = new Thread(clientToServerHttps);
+            transmission = new Thread(https);
             transmission.start();
 
 
@@ -429,72 +372,55 @@ public class Handler implements Runnable {
         }
     }
 
-
-
-
-    /**
-     * Listen to data from client and transmits it to server.
-     * This is done on a separate thread as must be done
-     * asynchronously to reading data from server and transmitting
-     * that data to the client.
-     */
-    class ClientToServerHttpsTransmit implements Runnable{
-
-        InputStream proxyToClientIS;
-        OutputStream proxyToServerOS;
-
-        /**
-         * Creates Object to Listen to Client and Transmit that data to the server
-         * @param proxyToClientIS Stream that proxy uses to receive data from client
-         * @param proxyToServerOS Stream that proxy uses to transmit data to remote server
-         */
-        public ClientToServerHttpsTransmit(InputStream proxyToClientIS, OutputStream proxyToServerOS) {
-            this.proxyToClientIS = proxyToClientIS;
-            this.proxyToServerOS = proxyToServerOS;
-        }
-
-        @Override
-        public void run(){
-            try {
-                // Read byte by byte from client and send directly to server
-                byte[] buffer = new byte[4096];
-                int read;
-                do {
-                    read = proxyToClientIS.read(buffer);
-                    if (read > 0) {
-                        proxyToServerOS.write(buffer, 0, read);
-                        if (proxyToClientIS.available() < 1) {
-                            proxyToServerOS.flush();
-                        }
-                    }
-                } while (read >= 0);
-            }
-            catch (SocketTimeoutException ste) {
-                // TODO: handle exception
-            }
-            catch (IOException e) {
-                System.out.println("Proxy to client HTTPS read timed out");
-                e.printStackTrace();
-            }
-        }
-    }
-
-
-    /**
-     * This method is called when user requests a page that is blocked by the proxy.
-     * Sends an access forbidden message back to the client
-     */
-    private void blockedSiteRequested(){
+    @Override
+    public void run() {
         try {
-            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            String line = "HTTP/1.0 403 Access Forbidden \n" +
-                    "User-Agent: ProxyServer/1.0\n" +
-                    "\r\n";
-            bufferedWriter.write(line);
-            bufferedWriter.flush();
+            requestToHandle = p2cReader.readLine();
         } catch (IOException e) {
-            System.out.println("Error writing to client when requested a blocked site");
-            e.printStackTrace();
+            System.out.println("Error reading the HTTPS requestToHandle");
+        }
+        System.out.println("Request received: " + requestToHandle);
+
+        //get url from the string
+        String method = requestToHandle.substring(0,requestToHandle.indexOf(' '));
+        String url = requestToHandle.substring(requestToHandle.indexOf(' ')+1);
+        url = url.substring(0,url.indexOf(' '));
+
+        if(!url.substring(0,4).equals("http")){
+            String http = "http://"; //put protocol on front to solve error
+            url = http + url;
+        }
+
+        Hashtable temp = Proxy.blocked;
+        //check if the page is blocked
+        if(temp.containsKey(url)){
+            System.out.println( url + " is blocked.\n Contact the administrator.");
+            try {
+                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                String error = "Site is blocked!";
+                bw.write(error);
+                bw.flush();
+            } catch (IOException e) {
+                System.out.println("Error handling a blocked site");
+            }
+        }
+
+
+        // Check request type
+        if(method.equals("CONNECT")){
+            System.out.println("Connection requested");
+            takeRequest(url);
+        }
+
+        else{
+            // Check if we have a cached copy
+            File cachedFile = Proxy.getFromCache(url);
+            if(cachedFile != null){
+                System.out.println("Page is present in cache");
+                useCachedPage(cachedFile);
+            } else {
+                sendNonCachedToClient(url);
+            }
         }
     }
 }
