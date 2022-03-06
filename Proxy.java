@@ -66,6 +66,17 @@ public class Proxy implements Runnable {
         running = true;
     }
 
+    public static void main(String[] args) {
+        Proxy proxy = null;
+        try {
+            proxy = new Proxy(8080);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        proxy.listen();
+        //listen for connections
+    }
+
     //listen for new connections
     public void listen() {
         try{
@@ -169,10 +180,5 @@ public class Proxy implements Runnable {
 
     }
 
-    public static void main(String[] args) throws ClassNotFoundException {
-        Proxy proxy = null;
-        proxy = new Proxy(8080);
-        proxy.listen();
-        //listen for connections
-    }
+
 }
