@@ -24,11 +24,6 @@ public class Handler implements Runnable {
         }
     }
 
-
-    /**
-     * Sends the specified cached file to the client
-     * @param cachedFile The file to be sent (can be image/text)
-     */
     private void useCachedPage(File cachedFile){
         // Read from File containing cached web page
         try{
@@ -93,12 +88,7 @@ public class Handler implements Runnable {
         }
     }
 
-
-    /**
-     * Sends the contents of the file specified by the urlString to the client
-     * @param urlString URL ofthe file requested
-     */
-    private void sendNonCachedToClient(String urlString){
+    private void getPage(String urlString){
 
         try{
 
@@ -208,102 +198,58 @@ public class Handler implements Runnable {
                 proxyToServerCon.setDoOutput(true);
 
                 // Create Buffered Reader from remote Server
-                BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerCon.getInputStream()));
-
-
-                // Send success code to client
-                String line = "HTTP/1.0 200 OK\n" +
-                        "Proxy-agent: ProxyServer/1.0\n" +
-                        "\r\n";
-                p2cWriter.write(line);
-
-
-                // Read from input stream between proxy and remote server
-                while((line = proxyToServerBR.readLine()) != null){
-                    // Send on data to client
-                    p2cWriter.write(line);
-
-                    // Write to our cached copy of the file
-                    if(caching){
-                        fileToCacheBW.write(line);
+                BufferedReader p2sReader = new BufferedReader(new InputStreamReader(proxyToServerCon.getInputStream()));
+                p2cWriter.write("Data recieved from remote server");
+                String data;
+                while((data = p2sReader.readLine()) != null){ //data from remote server
+                    p2cWriter.write(data); //write to client
+                    if(caching){  //write to cache
+                        fileToCacheBW.write(data);
                     }
                 }
-
-                // Ensure all data is sent by this point
                 p2cWriter.flush();
-
-                // Close Down Resources
-                if(proxyToServerBR != null){
-                    proxyToServerBR.close();
+                if(p2sReader != null){
+                    p2sReader.close();
                 }
             }
 
 
-            if(caching){
-                // Ensure data written and add to our cached hash maps
+            if(caching) {
                 fileToCacheBW.flush();
                 Proxy.addToCache(urlString, fileToCache);
             }
-
-            // Close down resources
             if(fileToCacheBW != null){
                 fileToCacheBW.close();
             }
-
             if(p2cWriter != null){
                 p2cWriter.close();
             }
         }
-
         catch (Exception e){
             e.printStackTrace();
         }
     }
 
-
-    /**
-     * Handles HTTPS requests between client and remote server
-     * @param urlString desired file to be transmitted over https
-     */
     private void takeRequest(String urlString){
         // Extract the URL and port of remote
         String url = urlString.substring(7);
-        String pieces[] = url.split(":");
-        url = pieces[0];
-        int port  = Integer.valueOf(pieces[1]);
+        String array[] = url.split(":");
+        url = array[0];
+        int port  = Integer.valueOf(array[1]);
 
         try{
-            // Only first line of HTTPS request has been read at this point (CONNECT *)
-            // Read (and throw away) the rest of the initial data on the stream
             for(int i=0;i<5;i++){
+                // Read the first section to get the type
                 p2cReader.readLine();
             }
-
-            // Get actual IP associated with this URL through DNS
-            InetAddress address = InetAddress.getByName(url);
-
-            // Open a socket to the remote server
-            Socket proxyToServerSocket = new Socket(address, port);
+            InetAddress address = InetAddress.getByName(url); //IP of the url
+            Socket proxyToServerSocket = new Socket(address, port); //socket to the relevant server remote
             proxyToServerSocket.setSoTimeout(5000);
-
-            // Send Connection established to the client
-            String line = "HTTP/1.0 200 Connection established\r\n" +
-                    "Proxy-Agent: ProxyServer/1.0\r\n" +
-                    "\r\n";
-            p2cWriter.write(line);
+            p2cWriter.write("Succesful connection to remote server");
             p2cWriter.flush();
-
-
-
-            // Client and Remote will both start sending data to proxy at this point
-            // Proxy needs to asynchronously read data from each party and send it to the other party
-
-
-            //Create a Buffered Writer betwen proxy and remote
-            BufferedWriter proxyToServerBW = new BufferedWriter(new OutputStreamWriter(proxyToServerSocket.getOutputStream()));
-
-            // Create Buffered Reader from proxy and remote
-            BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerSocket.getInputStream()));
+            //o-stream and i-stream to handle data coming to/from remote server and client via proxy
+            BufferedWriter p2sWriter = new BufferedWriter(new OutputStreamWriter(proxyToServerSocket.getOutputStream()));
+            BufferedReader p2sReader = new BufferedReader(new InputStreamReader(proxyToServerSocket.getInputStream()));
 
 
 
@@ -342,12 +288,12 @@ public class Handler implements Runnable {
                 proxyToServerSocket.close();
             }
 
-            if(proxyToServerBR != null){
-                proxyToServerBR.close();
+            if(p2sReader != null){
+                p2sReader.close();
             }
 
-            if(proxyToServerBW != null){
-                proxyToServerBW.close();
+            if(p2sWriter != null){
+                p2sWriter.close();
             }
 
             if(p2cWriter != null){
@@ -419,7 +365,7 @@ public class Handler implements Runnable {
                 System.out.println("Page is present in cache");
                 useCachedPage(cachedFile);
             } else {
-                sendNonCachedToClient(url);
+                getPage(url);
             }
         }
     }
